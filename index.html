@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LNG — CRM Live</title>
+<style>
+:root{--bg:#0a0a0a;--bg2:#111111;--bg3:#1a1a1a;--bg4:#222222;--border:#2a2a2a;--border2:#333333;--text:#f0f0f0;--text2:#888888;--text3:#555555;--gold:#c9a84c;--gold2:#e8c97a;--green:#22c55e;--orange:#f97316;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;}
+.main{margin-left:220px;padding:28px 32px;min-height:100vh;}
+.logo{padding:24px 20px 20px;border-bottom:1px solid var(--border);}
+.logo-text{font-size:15px;font-weight:700;letter-spacing:.15em;color:var(--gold2);}
+.logo-sub{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.08em;}
+.sync-row{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10px;color:var(--text3);}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);transition:background .3s;}
+.sync-dot.live{background:var(--green);animation:pulse 2s infinite;}
+.sync-dot.loading{background:var(--orange);animation:pulse .5s infinite;}
+.sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.nav{padding:16px 12px;flex:1;overflow-y:auto;}
+.nav-section{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:0 8px;margin-bottom:6px;margin-top:16px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--text2);font-size:13px;transition:all .15s;margin-bottom:2px;border:1px solid transparent;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:var(--bg4);color:var(--gold2);border-color:var(--border2);}
+.nav-icon{font-size:14px;width:18px;text-align:center;}
+.nav-badge{margin-left:auto;font-size:10px;background:var(--bg4);color:var(--text3);padding:2px 7px;border-radius:10px;}
+.nav-item.active .nav-badge{background:rgba(201,168,76,.15);color:var(--gold);}
+
+/* SETUP */
+.setup-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9000;}
+.setup-card{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:40px;width:500px;max-width:95vw;}
+.setup-logo{font-size:18px;font-weight:700;letter-spacing:.15em;color:var(--gold2);margin-bottom:4px;}
+.setup-sub{font-size:12px;color:var(--text3);margin-bottom:28px;}
+.setup-title{font-size:20px;font-weight:700;margin-bottom:8px;}
+.setup-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:24px;}
+.setup-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:block;}
+.setup-input{width:100%;padding:11px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;outline:none;margin-bottom:14px;font-family:'SF Mono',monospace;transition:border .15s;}
+.setup-input:focus{border-color:var(--gold);}
+.setup-btn{width:100%;padding:13px;border:1px solid var(--gold);border-radius:10px;background:rgba(201,168,76,.15);color:var(--gold2);font-size:14px;font-weight:700;cursor:pointer;}
+.setup-btn:hover{background:rgba(201,168,76,.25);}
+.setup-error{font-size:12px;color:var(--red);margin-top:-6px;margin-bottom:10px;display:none;}
+
+/* LOADING */
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8000;}
+.loading-screen.hidden{display:none;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;color:var(--text2);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-overlay.hidden{display:none;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:20px;color:var(--gold2);}
+.form-group{margin-bottom:13px;}
+.form-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:block;}
+.form-input{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:inherit;transition:border .15s;}
+.form-input:focus{border-color:var(--gold);}
+.form-select{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:inherit;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+.btn-cancel{padding:9px 18px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text2);font-size:13px;cursor:pointer;}
+.btn-save{padding:9px 18px;border:1px solid var(--gold);border-radius:8px;background:rgba(201,168,76,.15);color:var(--gold2);font-size:13px;cursor:pointer;font-weight:600;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;color:var(--text);z-index:9999;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none;max-width:300px;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* PAGE */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px;}
+.page-title{font-size:22px;font-weight:700;letter-spacing:.04em;}
+.page-sub{font-size:12px;color:var(--text2);margin-top:4px;}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi.gold::before{background:linear-gradient(90deg,var(--gold),var(--gold2));}
+.kpi.green::before{background:linear-gradient(90deg,#16a34a,var(--green));}
+.kpi.blue::before{background:linear-gradient(90deg,#1d4ed8,var(--blue));}
+.kpi.purple::before{background:linear-gradient(90deg,#7c3aed,var(--purple));}
+.kpi.orange::before{background:linear-gradient(90deg,#c2410c,var(--orange));}
+.kpi-n{font-size:28px;font-weight:700;margin-bottom:4px;}
+.kpi.gold .kpi-n{color:var(--gold2);}
+.kpi.green .kpi-n{color:var(--green);}
+.kpi.blue .kpi-n{color:var(--blue);}
+.kpi.purple .kpi-n{color:var(--purple);}
+.kpi.orange .kpi-n{color:var(--orange);}
+.kpi-l{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:6px;}
+
+/* CONTROLS */
+.controls{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+.search-box{flex:1;min-width:200px;position:relative;}
+.search-box input{width:100%;padding:9px 12px 9px 36px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none;}
+.filter-btn{padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.filter-btn.active{background:var(--bg3);border-color:var(--gold);color:var(--gold2);}
+.add-btn{padding:9px 18px;border:1px solid var(--gold);border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold2);font-size:12px;cursor:pointer;font-weight:500;white-space:nowrap;}
+.add-btn:hover{background:rgba(201,168,76,.2);}
+
+/* TABLE */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead tr{border-bottom:1px solid var(--border);}
+th{padding:11px 14px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:600;cursor:pointer;white-space:nowrap;user-select:none;}
+th:hover{color:var(--text2);}
+th.sort-asc::after{content:' ↑';color:var(--gold);}
+th.sort-desc::after{content:' ↓';color:var(--gold);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--bg3);}
+td{padding:10px 14px;vertical-align:middle;}
+.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.name-cell{display:flex;align-items:center;gap:10px;}
+.amb-name{font-weight:600;font-size:13px;}
+.amb-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.code-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--bg3);color:var(--text2);border:1px solid var(--border2);letter-spacing:.05em;font-family:'SF Mono',monospace;}
+.type-badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;white-space:nowrap;}
+.tb-amb{background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.25);}
+.tb-promo{background:rgba(201,168,76,.1);color:var(--gold2);border:1px solid rgba(201,168,76,.25);}
+.tb-bde{background:rgba(168,85,247,.1);color:#c084fc;border:1px solid rgba(168,85,247,.25);}
+.event-tag{font-size:10px;padding:2px 7px;border-radius:6px;margin:1px;display:inline-block;white-space:nowrap;}
+.et-c{background:rgba(34,197,94,.1);color:#86efac;border:1px solid rgba(34,197,94,.2);}
+.et-w{background:rgba(168,85,247,.1);color:#c084fc;border:1px solid rgba(168,85,247,.2);}
+.et-f{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2);}
+.et-s{background:rgba(249,115,22,.1);color:#fdba74;border:1px solid rgba(249,115,22,.2);}
+.ventes-wrap{display:flex;align-items:center;gap:8px;}
+.ventes-num{font-size:14px;font-weight:700;min-width:22px;text-align:center;cursor:pointer;padding:3px 7px;border-radius:6px;}
+.ventes-num:hover{background:var(--bg3);color:var(--gold2);}
+.vbar-bg{width:50px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.vbar{height:4px;border-radius:2px;transition:width .3s;}
+.status-pill{font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+.s-top{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.s-actif{background:rgba(34,197,94,.08);color:#86efac;border:1px solid rgba(34,197,94,.15);}
+.s-relance{background:rgba(249,115,22,.1);color:#fdba74;border:1px solid rgba(249,115,22,.2);}
+.s-cold{background:var(--bg3);color:var(--text3);border:1px solid var(--border);}
+.action-wrap{display:flex;gap:5px;flex-wrap:wrap;}
+.act-btn{padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:11px;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:3px;}
+.act-btn:hover{border-color:var(--border2);color:var(--text2);background:var(--bg3);}
+.act-btn.wa{border-color:rgba(37,211,102,.3);color:#25d366;}
+.act-btn.wa:hover{background:rgba(37,211,102,.1);}
+.act-btn.ig{border-color:rgba(225,48,108,.3);color:#e1306c;}
+.act-btn.ig:hover{background:rgba(225,48,108,.1);}
+.act-btn.edit{border-color:rgba(201,168,76,.3);color:var(--gold);}
+.act-btn.edit:hover{background:rgba(201,168,76,.1);}
+
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.dash-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.dash-card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;}
+.event-card{display:flex;align-items:center;gap:14px;padding:12px;background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--border);}
+.event-card:last-child{margin-bottom:0;}
+.event-dot-big{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.event-info{flex:1;}
+.event-name{font-weight:600;font-size:13px;}
+.event-date{font-size:11px;color:var(--text2);margin-top:2px;}
+.event-countdown{font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;margin-left:auto;white-space:nowrap;}
+.cd-today{background:rgba(239,68,68,.15);color:var(--red);}
+.cd-soon{background:rgba(249,115,22,.15);color:var(--orange);}
+.cd-future{background:rgba(34,197,94,.1);color:var(--green);}
+.top-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
+.top-row:last-child{border-bottom:none;}
+.top-rank{font-size:13px;font-weight:700;width:22px;color:var(--text3);}
+.top-rank.r1{color:#fbbf24;}.top-rank.r2{color:#9ca3af;}.top-rank.r3{color:#cd7c2f;}
+.top-name{flex:1;font-size:13px;font-weight:500;}
+.top-score{font-size:13px;font-weight:700;color:var(--gold2);}
+.ig-stat-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);}
+.ig-stat-row:last-child{border-bottom:none;}
+.ig-stat-label{font-size:12px;color:var(--text2);}
+.ig-stat-val{font-size:13px;font-weight:600;}
+.ig-stat-val.up{color:var(--green);}
+
+/* BDE */
+.bde-group{background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid var(--border);}
+.bde-group-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.bde-group-name{font-weight:600;font-size:14px;}
+.bde-group-count{font-size:10px;color:var(--text3);background:var(--bg4);padding:2px 7px;border-radius:8px;margin-left:auto;}
+.bde-member-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border);font-size:12px;flex-wrap:wrap;}
+.bde-member-post{color:var(--text3);}
+
+.section-sep{height:1px;background:var(--border);margin:20px 0;}
+.empty{text-align:center;padding:50px 20px;color:var(--text3);}
+.empty-icon{font-size:28px;margin-bottom:10px;}
+
+@media(max-width:900px){
+  .sidebar{width:60px;}
+  .sidebar .logo-text,.sidebar .logo-sub,.sidebar .sync-row span,.sidebar .nav-item span,.sidebar .nav-badge,.sidebar .nav-section{display:none;}
+  .sidebar .nav-item{justify-content:center;padding:12px;}
+  .main{margin-left:60px;padding:20px 16px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .dash-grid{grid-template-columns:1fr;}
+}
+@media(max-width:600px){.sidebar{display:none;}.main{margin-left:0;}}
+</style>
+</head>
+<body>
+
+<div class="setup-screen" id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">LNG</div>
+    <div class="setup-sub">Lyon Night Group — CRM Live</div>
+    <div class="setup-title">Configuration Airtable</div>
+    <div class="setup-desc">Entre ton token Airtable et l'ID de ta base. Les données sont partagées en temps réel avec toute l'équipe.</div>
+    <label class="setup-label">Token Airtable</label>
+    <input class="setup-input" id="setup-token" type="password" placeholder="patXXXXXX..." autocomplete="off">
+    <label class="setup-label">Base ID (pré-rempli)</label>
+    <input class="setup-input" id="setup-baseid" placeholder="appXXXXXX" autocomplete="off">
+    <div class="setup-error" id="setup-error">Token ou Base ID invalide — vérifie tes infos</div>
+    <button class="setup-btn" onclick="connectAirtable()">Connecter le CRM →</button>
+    <div style="margin-top:18px;font-size:11px;color:var(--text3);line-height:1.9">
+      Token : airtable.com/create/tokens<br>
+      Base ID : dans l'URL de ta base Airtable → appXXXXX<br>
+      Tables Airtable à créer : "La Commerciale" · "WildSide" · "Contacts"
+    </div>
+  </div>
+</div>
+
+<div class="loading-screen hidden" id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Connexion à Airtable...</div>
+</div>
+
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-text">LNG</div>
+    <div class="logo-sub">Lyon Night Group</div>
+    <div class="sync-row"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">—</span></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Menu</div>
+    <div class="nav-item active" id="nav-dash" onclick="showPage('dashboard')"><span class="nav-icon">📊</span><span>Dashboard</span></div>
+    <div class="nav-section">Ambassadeurs</div>
+    <div class="nav-item" id="nav-c" onclick="showPage('commerciale')"><span class="nav-icon">🎉</span><span>La Commerciale</span><span class="nav-badge" id="nb-c">—</span></div>
+    <div class="nav-item" id="nav-w" onclick="showPage('wildside')"><span class="nav-icon">🐰</span><span>WildSide</span><span class="nav-badge" id="nb-w">—</span></div>
+    <div class="nav-item" id="nav-b" onclick="showPage('both')"><span class="nav-icon">⭐</span><span>Les deux events</span><span class="nav-badge" id="nb-b">—</span></div>
+    <div class="nav-section">Réseau</div>
+    <div class="nav-item" id="nav-contacts" onclick="showPage('contacts')"><span class="nav-icon">👥</span><span>Contacts</span><span class="nav-badge" id="nb-contacts">—</span></div>
+    <div class="nav-section">Outils</div>
+    <div class="nav-item" onclick="exportCSV()"><span class="nav-icon">📥</span><span>Exporter CSV</span></div>
+    <div class="nav-item" onclick="refreshData()"><span class="nav-icon">🔄</span><span>Actualiser</span></div>
+    <div class="nav-item" onclick="resetConfig()"><span class="nav-icon">⚙️</span><span>Reconfigurer</span></div>
+  </nav>
+</div>
+
+<div class="main" id="main-content" style="display:none"></div>
+
+<!-- MODAL AMB -->
+<div class="modal-overlay hidden" id="modal-amb">
+  <div class="modal">
+    <div class="modal-title" id="modal-amb-title">Ajouter un ambassadeur</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nom complet</label><input class="form-input" id="fa-nom" placeholder="Prénom Nom"></div>
+      <div class="form-group"><label class="form-label">Code promo</label><input class="form-input" id="fa-code" placeholder="TITO"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="fa-wa" placeholder="0612345678"></div>
+      <div class="form-group"><label class="form-label">Instagram</label><input class="form-input" id="fa-ig" placeholder="pseudo"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">École</label><input class="form-input" id="fa-ecole" placeholder="EM Lyon..."></div>
+      <div class="form-group"><label class="form-label">Ventes</label><input class="form-input" id="fa-ventes" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Soirées</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fa-ev-c"> La Commerciale</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fa-ev-w"> WildSide</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fa-ev-f"> FOMO</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fa-ev-s"> Savage</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModals()">Annuler</button>
+      <button class="btn-save" id="btn-save-amb" onclick="saveAmb()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONTACT -->
+<div class="modal-overlay hidden" id="modal-contact">
+  <div class="modal">
+    <div class="modal-title" id="modal-contact-title">Ajouter un contact</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Prénom Nom</label><input class="form-input" id="fc-nom" placeholder="Nelly Dupont"></div>
+      <div class="form-group"><label class="form-label">Type</label>
+        <select class="form-select" id="fc-type">
+          <option value="Ambassadeur">Ambassadeur</option>
+          <option value="Promoteur">Promoteur</option>
+          <option value="BDE">BDE</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="fc-wa" placeholder="0783451583"></div>
+      <div class="form-group"><label class="form-label">Instagram</label><input class="form-input" id="fc-ig" placeholder="bde.synapsound"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">BDE / Association</label><input class="form-input" id="fc-bde" placeholder="BDE Synapsound"></div>
+      <div class="form-group"><label class="form-label">Poste</label><input class="form-input" id="fc-post" placeholder="Pôle Event"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Code promo (si ambass.)</label><input class="form-input" id="fc-code" placeholder="TITO"></div>
+      <div class="form-group"><label class="form-label">École</label><input class="form-input" id="fc-ecole" placeholder="EM Lyon"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Soirées</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fc-ev-c"> La Commerciale</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fc-ev-w"> WildSide</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fc-ev-f"> FOMO</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="fc-ev-s"> Savage</label>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="fc-notes" placeholder="Infos utiles..."></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModals()">Annuler</button>
+      <button class="btn-save" id="btn-save-contact" onclick="saveContact()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DEFAULT_BASE='apptLegszC3Z94CIl';
+let API_TOKEN='',BASE_ID=DEFAULT_BASE,TABLE_C='',TABLE_W='',TABLE_K='';
+let COMMERCIALE=[],WILDSIDE=[],CONTACTS=[];
+let currentPage='dashboard',filterStatus='tous',filterType='tous',sortKey='nom',sortDir=1;
+let editAmbId=null,editAmbEvent=null,editContactId=null;
+const AVT=[['#1e3a5f','#60a5fa'],['#14402a','#4ade80'],['#3d2a0f','#fbbf24'],['#3b0f1e','#f472b6'],['#2d1f4e','#a78bfa'],['#1f3040','#7dd3fc']];
+
+// EVENTS
+function getThursdays(n=10){const evs=[];const now=new Date();for(let i=0;i<n*7;i++){const d=new Date(now);d.setDate(now.getDate()+i);if(d.getDay()===4)evs.push({name:'La Commerciale',date:new Date(d),color:'#4ade80',type:'commerciale'});}return evs;}
+const FIXED_EVENTS=[{name:'WildSide 2Y Birthday',date:new Date('2026-04-18'),color:'#a78bfa',type:'wildside'}];
+function getAllEvents(){return[...getThursdays(10),...FIXED_EVENTS].sort((a,b)=>a.date-b.date).slice(0,8);}
+function daysUntil(d){const n=new Date();n.setHours(0,0,0,0);const t=new Date(d);t.setHours(0,0,0,0);return Math.round((t-n)/86400000);}
+function fmtDate(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});}
+
+// AIRTABLE
+async function atFetch(path,opts={}){
+  const r=await fetch(`https://api.airtable.com/v0/${path}`,{...opts,headers:{'Authorization':`Bearer ${API_TOKEN}`,'Content-Type':'application/json',...(opts.headers||{})}});
+  if(!r.ok)throw new Error(`AT ${r.status}`);return r.json();
+}
+async function fetchAll(tId){let recs=[],off=null;do{const d=await atFetch(`${BASE_ID}/${tId}?pageSize=100${off?'&offset='+off:''}`);recs=recs.concat(d.records);off=d.offset;}while(off);return recs;}
+async function updateRec(tId,id,fields){return atFetch(`${BASE_ID}/${tId}/${id}`,{method:'PATCH',body:JSON.stringify({fields})});}
+async function createRec(tId,fields){return atFetch(`${BASE_ID}/${tId}`,{method:'POST',body:JSON.stringify({fields})});}
+
+function toAmb(r){const f=r.fields;return{id:r.id,nom:f['Nom']||f['Name']||'',code:f['Code Promo']||f['Code']||'',ig:(f['Instagram']||'').replace('@',''),wa:f['WhatsApp']||f['Téléphone']||f['Tel']||'',ecole:f['École']||f['Ecole']||'',ventes:parseInt(f['Ventes']||0)||0,events:f['Soirées']||''};}
+function toContact(r){const f=r.fields;return{id:r.id,nom:f['Nom']||f['Name']||'',type:f['Type']||'Ambassadeur',ig:(f['Instagram']||'').replace('@',''),wa:f['WhatsApp']||f['Tel']||'',bde:f['BDE']||'',post:f['Poste']||'',code:f['Code']||'',ecole:f['École']||'',events:f['Soirées']||'',notes:f['Notes']||''};}
+
+// SETUP
+function loadConfig(){const t=localStorage.getItem('lng_tok3');if(t){API_TOKEN=t;BASE_ID=localStorage.getItem('lng_bid')||DEFAULT_BASE;TABLE_C=localStorage.getItem('lng_tc')||'';TABLE_W=localStorage.getItem('lng_tw')||'';TABLE_K=localStorage.getItem('lng_tk')||'';return true;}return false;}
+
+async function connectAirtable(){
+  const tok=document.getElementById('setup-token').value.trim();
+  const bid=document.getElementById('setup-baseid').value.trim()||DEFAULT_BASE;
+  if(!tok)return;
+  API_TOKEN=tok;BASE_ID=bid;
+  document.getElementById('setup-error').style.display='none';
+  document.getElementById('setup-screen').style.display='none';
+  showLoading('Connexion à Airtable...');
+  try{
+    const meta=await atFetch(`meta/bases/${BASE_ID}/tables`);
+    const tabs=meta.tables;
+    TABLE_C=(tabs.find(t=>/commerciale/i.test(t.name))||tabs[0])?.id||'';
+    TABLE_W=(tabs.find(t=>/wildside|wild/i.test(t.name))||tabs[1])?.id||'';
+    TABLE_K=(tabs.find(t=>/contact|réseau|reseau/i.test(t.name))||tabs[2])?.id||'';
+    localStorage.setItem('lng_tok3',tok);localStorage.setItem('lng_bid',BASE_ID);
+    localStorage.setItem('lng_tc',TABLE_C);localStorage.setItem('lng_tw',TABLE_W);localStorage.setItem('lng_tk',TABLE_K);
+    await loadAllData();
+  }catch(e){hideLoading();document.getElementById('setup-screen').style.display='flex';document.getElementById('setup-error').style.display='block';API_TOKEN='';}
+}
+
+function resetConfig(){localStorage.clear();location.reload();}
+
+async function loadAllData(){
+  showLoading('Chargement des données...');setSyncStatus('loading','Chargement...');
+  try{
+    if(TABLE_C){const r=await fetchAll(TABLE_C);COMMERCIALE=r.map(toAmb).filter(a=>a.nom);}
+    if(TABLE_W&&TABLE_W!==TABLE_C){const r=await fetchAll(TABLE_W);WILDSIDE=r.map(toAmb).filter(a=>a.nom);}
+    if(TABLE_K){const r=await fetchAll(TABLE_K);CONTACTS=r.map(toContact).filter(a=>a.nom);}
+    hideLoading();document.getElementById('main-content').style.display='block';
+    setSyncStatus('live','Connecté · Live');updateBadges();showPage(currentPage);
+  }catch(e){hideLoading();setSyncStatus('error','Erreur');toast('❌ Erreur Airtable');}
+}
+
+async function refreshData(){toast('🔄 Actualisation...');await loadAllData();toast('✅ Actualisé');}
+
+// RENDER DASHBOARD
+function renderDashboard(){
+  const allAmb=[...COMMERCIALE,...WILDSIDE];
+  const totalV=allAmb.reduce((s,a)=>s+a.ventes,0);
+  const byCode={};allAmb.forEach(a=>{if(!byCode[a.code]||byCode[a.code].ventes<a.ventes)byCode[a.code]=a;});
+  const topList=Object.values(byCode).sort((a,b)=>b.ventes-a.ventes).slice(0,8);
+  const events=getAllEvents();
+  const evHtml=events.map(ev=>{const d=daysUntil(ev.date);let cls='cd-future',txt=`J-${d}`;if(d===0){cls='cd-today';txt='CE SOIR 🔥';}else if(d<=7){cls='cd-soon';}return`<div class="event-card"><div class="event-dot-big" style="background:${ev.color}"></div><div class="event-info"><div class="event-name">${ev.name}</div><div class="event-date">${fmtDate(ev.date)}</div></div><div class="event-countdown ${cls}">${txt}</div></div>`;}).join('');
+  const topHtml=topList.length===0?`<div style="color:var(--text3);font-size:13px;padding:20px 0">Aucune vente</div>`:topList.map((a,i)=>`<div class="top-row"><div class="top-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="avatar" style="background:${AVT[i%6][0]};color:${AVT[i%6][1]};width:26px;height:26px;font-size:9px;margin-right:2px">${initials(a.nom)}</div><div class="top-name">${a.nom}<span style="font-size:10px;color:var(--text3);margin-left:5px">${a.code}</span></div><div class="top-score">${a.ventes} 🎟</div></div>`).join('');
+  const igStats=[{l:'Vues (30j)',v:'96 780',u:true},{l:'Interactions',v:'1 099',u:true},{l:'Followers',v:'379'},{l:'Visites profil',v:'2 125',u:true},{l:'Non-followers reach',v:'73.8%',u:true},{l:'Clics lien bio',v:'169'},{l:'Top contenu',v:'SAVAGE 🐆'},{l:'Meilleure heure',v:'18h–23h'}];
+  document.getElementById('main-content').innerHTML=`
+    <div class="page-header"><div><div class="page-title" style="color:var(--gold2)">Dashboard LNG</div><div class="page-sub">Lyon Night Group · Vue globale</div></div><button class="add-btn" onclick="refreshData()">🔄 Actualiser</button></div>
+    <div class="kpi-grid">
+      <div class="kpi gold"><div class="kpi-n">${new Set([...COMMERCIALE.map(a=>a.code),...WILDSIDE.map(a=>a.code)]).size}</div><div class="kpi-l">Ambassadeurs</div><div class="kpi-sub">tous events</div></div>
+      <div class="kpi green"><div class="kpi-n">${totalV}</div><div class="kpi-l">Tickets vendus</div><div class="kpi-sub">total cumulé</div></div>
+      <div class="kpi blue"><div class="kpi-n">${CONTACTS.length}</div><div class="kpi-l">Contacts réseau</div><div class="kpi-sub">BDE + promoteurs</div></div>
+      <div class="kpi purple"><div class="kpi-n">379</div><div class="kpi-l">Followers IG</div><div class="kpi-sub">@lyonnightgroup</div></div>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-card-title">📅 Prochains événements</div>${evHtml}</div>
+      <div class="dash-card"><div class="dash-card-title">🏆 Top vendeurs</div>${topHtml}</div>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-card-title">📱 Instagram @lyonnightgroup</div>${igStats.map(s=>`<div class="ig-stat-row"><span class="ig-stat-label">${s.l}</span><span class="ig-stat-val ${s.u?'up':''}">${s.v}</span></div>`).join('')}<div style="margin-top:12px"><a href="https://instagram.com/lyonnightgroup" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none">Voir le profil →</a></div></div>
+      <div class="dash-card"><div class="dash-card-title">⚡ Actions rapides</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+          <button class="add-btn" style="width:100%;text-align:left" onclick="showPage('contacts');openAddContact()">+ Ajouter un contact</button>
+          <button class="add-btn" style="width:100%;text-align:left;border-color:var(--blue);color:var(--blue);background:rgba(59,130,246,.08)" onclick="showPage('commerciale');openAddAmb()">+ Ambassadeur Commerciale</button>
+          <button class="add-btn" style="width:100%;text-align:left;border-color:var(--purple);color:#c084fc;background:rgba(168,85,247,.08)" onclick="showPage('wildside');openAddAmb()">+ Ambassadeur WildSide</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// RENDER AMB
+function renderAmb(){
+  const data=getData();const bc=getBothCodes();
+  const eL=currentPage==='commerciale'?'La Commerciale':currentPage==='wildside'?'WildSide':'Les deux événements';
+  const eC=currentPage==='commerciale'?'#4ade80':currentPage==='wildside'?'#a78bfa':'#fbbf24';
+  const totalV=data.reduce((s,a)=>s+a.ventes,0);const actifs=data.filter(a=>a.ventes>0).length;
+  const search=document.getElementById('srch')?.value||'';
+  let list=[...data];
+  if(filterStatus==='actifs')list=list.filter(a=>a.ventes>0);
+  if(filterStatus==='zero')list=list.filter(a=>a.ventes===0);
+  if(filterStatus==='top')list=list.filter(a=>a.ventes>=10);
+  if(search){const s=search.toLowerCase();list=list.filter(a=>a.nom.toLowerCase().includes(s)||a.code.toLowerCase().includes(s)||(a.ecole||'').toLowerCase().includes(s));}
+  list.sort((a,b)=>{const va=sortKey==='ventes'?a.ventes:(a[sortKey]||'');const vb=sortKey==='ventes'?b.ventes:(b[sortKey]||'');if(typeof va==='number')return sortDir*(vb-va);return sortDir*String(va).localeCompare(String(vb));});
+  const maxV=Math.max(...data.map(x=>x.ventes),1);
+  document.getElementById('main-content').innerHTML=`
+    <div class="page-header"><div><div class="page-title" style="color:${eC}">${eL}</div><div class="page-sub">${data.length} ambassadeurs · Sync Airtable live</div></div><button class="add-btn" onclick="openAddAmb()">+ Ajouter</button></div>
+    <div class="kpi-grid">
+      <div class="kpi gold"><div class="kpi-n">${data.length}</div><div class="kpi-l">Ambassadeurs</div></div>
+      <div class="kpi green"><div class="kpi-n">${totalV}</div><div class="kpi-l">Tickets vendus</div><div class="kpi-sub">obj: ${data.length*8}</div></div>
+      <div class="kpi blue"><div class="kpi-n">${actifs}</div><div class="kpi-l">Actifs</div><div class="kpi-sub">${data.length-actifs} à relancer</div></div>
+      <div class="kpi purple"><div class="kpi-n">${data.filter(a=>a.ventes>=10).length}</div><div class="kpi-l">Top performers</div></div>
+    </div>
+    <div class="controls">
+      <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="srch" placeholder="Nom, code, école..." value="${search}" oninput="renderMain()"></div>
+      <button class="filter-btn ${filterStatus==='tous'?'active':''}" onclick="setFAm('tous')">Tous (${data.length})</button>
+      <button class="filter-btn ${filterStatus==='actifs'?'active':''}" onclick="setFAm('actifs')">✅ Actifs (${actifs})</button>
+      <button class="filter-btn ${filterStatus==='zero'?'active':''}" onclick="setFAm('zero')">🔴 0 ventes (${data.length-actifs})</button>
+      <button class="filter-btn ${filterStatus==='top'?'active':''}" onclick="setFAm('top')">⭐ Top</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th onclick="setSort('nom')" class="${sortKey==='nom'?'sort-'+(sortDir>0?'asc':'desc'):''}">Ambassadeur</th>
+        <th>Code</th>
+        <th onclick="setSort('ventes')" class="${sortKey==='ventes'?'sort-'+(sortDir>0?'asc':'desc'):''}">Ventes</th>
+        <th>Soirées</th><th>Instagram</th><th>WhatsApp</th><th>École</th><th>Statut</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${list.length===0?`<tr><td colspan="9"><div class="empty"><div class="empty-icon">🔍</div>Aucun résultat</div></td></tr>`:
+      list.map((a,i)=>{
+        const[bg,fg]=AVT[i%6];const st=getStatus(a.ventes);const inBoth=bc.has(a.code);
+        const barW=Math.round(a.ventes/maxV*100);const barC=a.ventes>=10?'#22c55e':a.ventes>0?'#f97316':'#333';
+        const waLink=a.wa?`https://wa.me/33${a.wa.replace(/^0/,'').replace(/[\s.-]/g,'')}`:'';
+        const evTags=evTagsHtml(a.events);
+        return`<tr>
+          <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg}">${initials(a.nom)}</div>
+          <div><div class="amb-name">${a.nom}${inBoth&&currentPage!=='both'?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(201,168,76,.15);color:var(--gold);border:1px solid rgba(201,168,76,.3);margin-left:5px">2 events</span>':''}</div>
+          ${a.ecole?`<div class="amb-sub">${a.ecole}</div>`:''}</div></div></td>
+          <td><span class="code-badge">${a.code}</span></td>
+          <td><div class="ventes-wrap"><span class="ventes-num" onclick="editVentes('${a.id}','${currentPage}')">${a.ventes}</span><div class="vbar-bg"><div class="vbar" style="width:${barW}%;background:${barC}"></div></div></div></td>
+          <td>${evTags||'—'}</td>
+          <td>${a.ig?`<a class="act-btn ig" href="https://instagram.com/${a.ig}" target="_blank">@${a.ig}</a>`:'—'}</td>
+          <td>${waLink?`<a class="act-btn wa" href="${waLink}" target="_blank">💬 WA</a>`:'—'}</td>
+          <td style="font-size:11px;color:var(--text3)">${a.ecole||'—'}</td>
+          <td><span class="status-pill ${st.cls}">${st.label}</span></td>
+          <td><div class="action-wrap">
+            <button class="act-btn edit" onclick="openEditAmb('${a.id}','${currentPage}')">✏️</button>
+            <button class="act-btn" onclick="copyRelance('${a.nom}','${a.code}',${a.ventes})">📨</button>
+          </div></td>
+        </tr>`;}).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// RENDER CONTACTS
+function renderContacts(){
+  const search=document.getElementById('srch-c')?.value||'';
+  let list=[...CONTACTS];
+  if(filterType!=='tous')list=list.filter(c=>c.type===filterType);
+  if(search){const s=search.toLowerCase();list=list.filter(c=>c.nom.toLowerCase().includes(s)||(c.bde||'').toLowerCase().includes(s)||(c.ig||'').toLowerCase().includes(s));}
+
+  const bdeGroups={};
+  list.filter(c=>c.type==='BDE').forEach(c=>{const k=c.bde||c.nom;if(!bdeGroups[k])bdeGroups[k]=[];bdeGroups[k].push(c);});
+  const nonBde=list.filter(c=>c.type!=='BDE');
+
+  const bdeHtml=Object.entries(bdeGroups).map(([name,members])=>`
+    <div class="bde-group">
+      <div class="bde-group-header">
+        <div class="avatar" style="background:#2d1f4e;color:#a78bfa;width:36px;height:36px;font-size:11px">${name.slice(0,2).toUpperCase()}</div>
+        <div><div class="bde-group-name">${name}</div>${members[0]?.ig?`<div style="font-size:11px;color:var(--text3)">@${members[0].ig}</div>`:''}</div>
+        <span class="bde-group-count">${members.length} contact${members.length>1?'s':''}</span>
+      </div>
+      ${members.map(m=>{const waL=m.wa?`https://wa.me/33${m.wa.replace(/^0/,'').replace(/[\s.-]/g,'')}`:'';
+        return`<div class="bde-member-row">
+          <div class="avatar" style="background:#1e3a5f;color:#60a5fa;width:28px;height:28px;font-size:9px;flex-shrink:0">${initials(m.nom)}</div>
+          <div style="flex:1"><span style="font-weight:500">${m.nom}</span>${m.post?`<span class="bde-member-post"> · ${m.post}</span>`:''}</div>
+          ${evTagsHtml(m.events)}
+          <div class="action-wrap">
+            ${waL?`<a class="act-btn wa" href="${waL}" target="_blank">💬 WA</a>`:''}
+            ${m.ig?`<a class="act-btn ig" href="https://instagram.com/${m.ig}" target="_blank">📸 IG</a>`:''}
+            <button class="act-btn edit" onclick="openEditContact('${m.id}')">✏️</button>
+          </div>
+        </div>`;}).join('')}
+    </div>`).join('');
+
+  const rowsHtml=nonBde.map((c,i)=>{
+    const[bg,fg]=AVT[i%6];const tCls=c.type==='Ambassadeur'?'tb-amb':c.type==='Promoteur'?'tb-promo':'tb-bde';
+    const waL=c.wa?`https://wa.me/33${c.wa.replace(/^0/,'').replace(/[\s.-]/g,'')}`:'';
+    return`<tr>
+      <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};width:34px;height:34px">${initials(c.nom)}</div>
+      <div><div class="amb-name">${c.nom}</div>${c.ecole?`<div class="amb-sub">${c.ecole}</div>`:c.notes?`<div class="amb-sub">${c.notes}</div>`:''}</div></div></td>
+      <td><span class="type-badge ${tCls}">${c.type}</span></td>
+      <td>${evTagsHtml(c.events)||'—'}</td>
+      <td>${c.code?`<span class="code-badge">${c.code}</span>`:'—'}</td>
+      <td>${c.ig?`<a class="act-btn ig" href="https://instagram.com/${c.ig}" target="_blank">@${c.ig}</a>`:'—'}</td>
+      <td>${waL?`<a class="act-btn wa" href="${waL}" target="_blank">💬 ${c.wa}</a>`:'—'}</td>
+      <td><div class="action-wrap">
+        <button class="act-btn edit" onclick="openEditContact('${c.id}')">✏️</button>
+        <button class="act-btn" onclick="copyMsg('${c.nom}')">📨</button>
+      </div></td>
+    </tr>`;}).join('');
+
+  document.getElementById('main-content').innerHTML=`
+    <div class="page-header"><div><div class="page-title" style="color:var(--blue)">Contacts & Réseau</div><div class="page-sub">Ambassadeurs · Promoteurs · BDE — tout en un</div></div><button class="add-btn" onclick="openAddContact()">+ Ajouter</button></div>
+    <div class="controls">
+      <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="srch-c" placeholder="Nom, BDE, Instagram..." value="${search}" oninput="renderMain()"></div>
+      <button class="filter-btn ${filterType==='tous'?'active':''}" onclick="setFT('tous')">Tous (${CONTACTS.length})</button>
+      <button class="filter-btn ${filterType==='Ambassadeur'?'active':''}" onclick="setFT('Ambassadeur')">Ambassadeurs</button>
+      <button class="filter-btn ${filterType==='Promoteur'?'active':''}" onclick="setFT('Promoteur')">Promoteurs</button>
+      <button class="filter-btn ${filterType==='BDE'?'active':''}" onclick="setFT('BDE')">BDE</button>
+    </div>
+    ${Object.keys(bdeGroups).length>0&&(filterType==='tous'||filterType==='BDE')?`<div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;font-weight:600">BDE & Associations</div>${bdeHtml}</div><div class="section-sep"></div>`:'' }
+    ${nonBde.length>0||filterType==='tous'?`<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;font-weight:600">Ambassadeurs & Promoteurs</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Contact</th><th>Type</th><th>Soirées</th><th>Code</th><th>Instagram</th><th>WhatsApp</th><th>Actions</th></tr></thead>
+      <tbody>${rowsHtml||`<tr><td colspan="7"><div class="empty"><div class="empty-icon">👥</div>Aucun contact — clique "+ Ajouter"</div></td></tr>`}</tbody>
+    </table></div>`:''}`;
+}
+
+function evTagsHtml(events){
+  if(!events)return'';
+  return[['La Commerciale','et-c'],['WildSide','et-w'],['FOMO','et-f'],['Savage','et-s']].filter(([e])=>events.includes(e)).map(([e,c])=>`<span class="event-tag ${c}">${e}</span>`).join('');
+}
+
+// MAIN RENDER
+function renderMain(){if(currentPage==='dashboard')renderDashboard();else if(currentPage==='contacts')renderContacts();else renderAmb();}
+
+function showPage(page){
+  currentPage=page;filterStatus='tous';
+  const ps=['dashboard','commerciale','wildside','both','contacts'];
+  const ns=['nav-dash','nav-c','nav-w','nav-b','nav-contacts'];
+  ns.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.classList.toggle('active',ps[i]===page);});
+  renderMain();
+}
+
+function updateBadges(){
+  const bc=getBothCodes();
+  document.getElementById('nb-c').textContent=COMMERCIALE.length;
+  document.getElementById('nb-w').textContent=WILDSIDE.length;
+  document.getElementById('nb-b').textContent=bc.size;
+  document.getElementById('nb-contacts').textContent=CONTACTS.length;
+}
+
+// HELPERS
+function getBothCodes(){const w=new Set(WILDSIDE.map(a=>a.code));return new Set(COMMERCIALE.filter(a=>w.has(a.code)).map(a=>a.code));}
+function getData(){if(currentPage==='commerciale')return COMMERCIALE;if(currentPage==='wildside')return WILDSIDE;const bc=getBothCodes();return COMMERCIALE.filter(a=>bc.has(a.code));}
+function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+function getStatus(v){if(v>=20)return{label:'TOP 🔥',cls:'s-top'};if(v>=5)return{label:'Actif',cls:'s-actif'};if(v>=1)return{label:'À relancer',cls:'s-relance'};return{label:'0 ventes',cls:'s-cold'};}
+function setFAm(f){filterStatus=f;renderMain();}
+function setFT(f){filterType=f;renderMain();}
+function setSort(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=k==='ventes'?-1:1;}renderMain();}
+function setSyncStatus(t,l){document.getElementById('sync-dot').className='sync-dot '+t;document.getElementById('sync-label').textContent=l;}
+function showLoading(m){document.getElementById('loading-text').textContent=m;document.getElementById('loading-screen').classList.remove('hidden');}
+function hideLoading(){document.getElementById('loading-screen').classList.add('hidden');}
+function closeModals(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.add('hidden'));}
+
+// EDIT VENTES
+async function editVentes(id,ev){
+  const data=ev==='wildside'?WILDSIDE:COMMERCIALE;
+  const amb=data.find(a=>a.id===id);if(!amb)return;
+  const v=prompt(`Ventes pour ${amb.nom} :`,amb.ventes);
+  if(v===null||isNaN(parseInt(v)))return;
+  const nV=parseInt(v);setSyncStatus('loading','Sauvegarde...');
+  try{await updateRec(ev==='wildside'?TABLE_W:TABLE_C,id,{'Ventes':nV});amb.ventes=nV;setSyncStatus('live','Connecté · Live');toast(`✅ ${amb.nom} → ${nV} vente${nV>1?'s':''}`);renderMain();}
+  catch(e){setSyncStatus('error','Erreur');toast('❌ Erreur sauvegarde');}
+}
+
+// AMB MODAL
+function openAddAmb(){editAmbId=null;editAmbEvent=currentPage==='wildside'?'wildside':'commerciale';document.getElementById('modal-amb-title').textContent='+ Ajouter un ambassadeur';['fa-nom','fa-code','fa-ig','fa-wa','fa-ecole'].forEach(f=>document.getElementById(f).value='');document.getElementById('fa-ventes').value=0;['fa-ev-c','fa-ev-w','fa-ev-f','fa-ev-s'].forEach(f=>document.getElementById(f).checked=false);document.getElementById('modal-amb').classList.remove('hidden');}
+
+function openEditAmb(id,ev){const data=ev==='wildside'?WILDSIDE:COMMERCIALE;const a=data.find(x=>x.id===id);if(!a)return;editAmbId=id;editAmbEvent=ev;document.getElementById('modal-amb-title').textContent='Modifier '+a.nom;document.getElementById('fa-nom').value=a.nom;document.getElementById('fa-code').value=a.code;document.getElementById('fa-ig').value=a.ig;document.getElementById('fa-wa').value=a.wa||'';document.getElementById('fa-ecole').value=a.ecole||'';document.getElementById('fa-ventes').value=a.ventes;const evs=a.events||'';document.getElementById('fa-ev-c').checked=evs.includes('Commerciale');document.getElementById('fa-ev-w').checked=evs.includes('WildSide');document.getElementById('fa-ev-f').checked=evs.includes('FOMO');document.getElementById('fa-ev-s').checked=evs.includes('Savage');document.getElementById('modal-amb').classList.remove('hidden');}
+
+async function saveAmb(){
+  const nom=document.getElementById('fa-nom').value.trim();const code=document.getElementById('fa-code').value.trim().toUpperCase();
+  if(!nom||!code){alert('Nom et code requis');return;}
+  const evs=['La Commerciale','WildSide','FOMO','Savage'].filter((_,i)=>document.getElementById(['fa-ev-c','fa-ev-w','fa-ev-f','fa-ev-s'][i]).checked).join(', ');
+  const fields={'Nom':nom,'Code Promo':code,'Instagram':document.getElementById('fa-ig').value.trim(),'WhatsApp':document.getElementById('fa-wa').value.trim(),'École':document.getElementById('fa-ecole').value.trim(),'Ventes':parseInt(document.getElementById('fa-ventes').value)||0,'Soirées':evs};
+  const btn=document.getElementById('btn-save-amb');btn.textContent='...';btn.disabled=true;setSyncStatus('loading','Sauvegarde...');
+  try{
+    const tId=editAmbEvent==='wildside'?TABLE_W:TABLE_C;const data=editAmbEvent==='wildside'?WILDSIDE:COMMERCIALE;
+    if(editAmbId){await updateRec(tId,editAmbId,fields);const a=data.find(x=>x.id===editAmbId);if(a)Object.assign(a,{nom,code,ig:fields['Instagram'],wa:fields['WhatsApp'],ecole:fields['École'],ventes:fields['Ventes'],events:evs});toast('✅ Modifié');}
+    else{const res=await createRec(tId,fields);data.push({id:res.id,nom,code,ig:fields['Instagram'],wa:fields['WhatsApp'],ecole:fields['École'],ventes:fields['Ventes'],events:evs});toast('✅ Ajouté');updateBadges();}
+    setSyncStatus('live','Connecté · Live');closeModals();renderMain();
+  }catch(e){setSyncStatus('error','Erreur');toast('❌ Erreur');}
+  btn.textContent='Enregistrer';btn.disabled=false;
+}
+
+// CONTACT MODAL
+function openAddContact(){editContactId=null;document.getElementById('modal-contact-title').textContent='+ Ajouter un contact';['fc-nom','fc-wa','fc-ig','fc-bde','fc-post','fc-code','fc-ecole','fc-notes'].forEach(f=>document.getElementById(f).value='');document.getElementById('fc-type').value='Ambassadeur';['fc-ev-c','fc-ev-w','fc-ev-f','fc-ev-s'].forEach(f=>document.getElementById(f).checked=false);document.getElementById('modal-contact').classList.remove('hidden');}
+
+function openEditContact(id){const c=CONTACTS.find(x=>x.id===id);if(!c)return;editContactId=id;document.getElementById('modal-contact-title').textContent='Modifier '+c.nom;document.getElementById('fc-nom').value=c.nom;document.getElementById('fc-type').value=c.type;document.getElementById('fc-wa').value=c.wa||'';document.getElementById('fc-ig').value=c.ig||'';document.getElementById('fc-bde').value=c.bde||'';document.getElementById('fc-post').value=c.post||'';document.getElementById('fc-code').value=c.code||'';document.getElementById('fc-ecole').value=c.ecole||'';document.getElementById('fc-notes').value=c.notes||'';const evs=c.events||'';document.getElementById('fc-ev-c').checked=evs.includes('Commerciale');document.getElementById('fc-ev-w').checked=evs.includes('WildSide');document.getElementById('fc-ev-f').checked=evs.includes('FOMO');document.getElementById('fc-ev-s').checked=evs.includes('Savage');document.getElementById('modal-contact').classList.remove('hidden');}
+
+async function saveContact(){
+  const nom=document.getElementById('fc-nom').value.trim();if(!nom){alert('Nom requis');return;}
+  const evs=['La Commerciale','WildSide','FOMO','Savage'].filter((_,i)=>document.getElementById(['fc-ev-c','fc-ev-w','fc-ev-f','fc-ev-s'][i]).checked).join(', ');
+  const fields={'Nom':nom,'Type':document.getElementById('fc-type').value,'WhatsApp':document.getElementById('fc-wa').value.trim(),'Instagram':document.getElementById('fc-ig').value.trim().replace('@',''),'BDE':document.getElementById('fc-bde').value.trim(),'Poste':document.getElementById('fc-post').value.trim(),'Code':document.getElementById('fc-code').value.trim().toUpperCase(),'École':document.getElementById('fc-ecole').value.trim(),'Notes':document.getElementById('fc-notes').value.trim(),'Soirées':evs};
+  const btn=document.getElementById('btn-save-contact');btn.textContent='...';btn.disabled=true;setSyncStatus('loading','Sauvegarde...');
+  try{
+    if(editContactId){await updateRec(TABLE_K,editContactId,fields);const c=CONTACTS.find(x=>x.id===editContactId);if(c)Object.assign(c,{nom,type:fields['Type'],wa:fields['WhatsApp'],ig:fields['Instagram'],bde:fields['BDE'],post:fields['Poste'],code:fields['Code'],ecole:fields['École'],notes:fields['Notes'],events:evs});toast('✅ Contact modifié');}
+    else{if(!TABLE_K){toast('❌ Table Contacts manquante dans Airtable');btn.textContent='Enregistrer';btn.disabled=false;return;}const res=await createRec(TABLE_K,fields);CONTACTS.push({id:res.id,nom,type:fields['Type'],wa:fields['WhatsApp'],ig:fields['Instagram'],bde:fields['BDE'],post:fields['Poste'],code:fields['Code'],ecole:fields['École'],notes:fields['Notes'],events:evs});toast('✅ Contact ajouté');updateBadges();}
+    setSyncStatus('live','Connecté · Live');closeModals();renderMain();
+  }catch(e){setSyncStatus('error','Erreur');toast('❌ Erreur sauvegarde');}
+  btn.textContent='Enregistrer';btn.disabled=false;
+}
+
+// UTILS
+function copyRelance(nom,code,ventes){const p=nom.split(' ')[0];const m=`Salut ${p} 👋\n\nT'as vendu ${ventes} place${ventes>1?'s':''} avec ton code ${code}.\n\n${ventes===0?"Ton code n'a pas encore été utilisé — fais tourner à tes potes maintenant 🔥":ventes<5?"Continue, objectif 8 ventes minimum 💪":"T'es dans les tops 🔥 continue !"}\n\nLien : [LIEN YURPLAN]`;navigator.clipboard.writeText(m).then(()=>toast(`📨 Message copié pour ${p}`));}
+function copyMsg(nom){const p=nom.split(' ')[0];navigator.clipboard.writeText(`Salut ${p} 👋\n\n`).then(()=>toast(`📨 Message copié pour ${p}`));}
+
+function exportCSV(){
+  const data=currentPage==='contacts'?CONTACTS:getData();
+  const headers=currentPage==='contacts'?['Nom','Type','WhatsApp','Instagram','BDE','Poste','Code','Soirées']:['Nom','Code','WhatsApp','Instagram','École','Ventes'];
+  const rows=[headers,...data.map(a=>currentPage==='contacts'?[a.nom,a.type,a.wa,a.ig,a.bde,a.post,a.code,a.events]:[a.nom,a.code,a.wa,a.ig,a.ecole,a.ventes])];
+  const csv=rows.map(r=>r.map(v=>`"${v||''}"`).join(',')).join('\n');
+  const el=document.createElement('a');el.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);el.download=`LNG_${currentPage}_${new Date().toISOString().slice(0,10)}.csv`;el.click();toast('📥 Export CSV');
+}
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
+
+// INIT
+document.getElementById('setup-baseid').value=DEFAULT_BASE;
+if(loadConfig()){document.getElementById('setup-screen').style.display='none';loadAllData();}
+</script>
+</body>
+</html>
